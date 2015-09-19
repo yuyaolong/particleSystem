@@ -42,7 +42,7 @@ private:
     Vector3d velocity;
     Vector4d color;
     double mass;
-    double lifeSpan;
+    int lifeSpan;
     double pointSize;
     bool   stopSign;
     

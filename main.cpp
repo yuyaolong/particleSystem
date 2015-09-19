@@ -11,7 +11,9 @@
 #include "gauss.h"
 #include "Particle.h"
 
-#define automaticSpeed 10
+#define automaticSpeed 20
+#define cleanSpeed 3000
+
 int WIDTH = 800;
 int HEIGHT = 800;
 
@@ -21,6 +23,7 @@ double hStep = 0.1;
 
 Camera *camera;
 std::vector<Particle>particles;
+std::vector<Particle>::iterator it;
 
 
 Vector3d particleAcceleration(0, -1, 0);
@@ -39,6 +42,14 @@ void motionEventHandler(int x, int y) {
 }
 
 
+void particlesGenerator()
+{
+        for (float i = -5; i<5; i+=1) {
+            particles.push_back( Particle(Vector3d(i,gauss(10, 1, 1),-10), Vector3d(0,0,gauss(2, 0.5, 1)), Vector4d(0,1,1,1), 1, 10, 0.5, false) );//position,velocity,color,mass,lifespan,pointsize,stopSign
+    }
+
+}
+
 
 void init() {
     //LoadParameters(ParamFilename);
@@ -53,14 +64,9 @@ void init() {
     
     //glEnable(GL_DEPTH_TEST);
     glEnable(GL_NORMALIZE);
-    
-    particles.reserve(1000);
-    for (float i = -5; i<5; i+=0.1) {
-        for (float j = -10; j<10; j+=0.1) {
-            particles.push_back( Particle(Vector3d(i,j,j), Vector3d(0,0,0), Vector4d(0,1,1,1), 1, 10, 0.5, false) );//position,velocity,color,mass,lifespan,pointsize,stopSign
-        }
-    }
-    
+    particles.reserve(10000000);
+    particlesGenerator();
+        
 }
 
 
@@ -95,23 +101,32 @@ void myDisplay(void)
 void calculatePosition()
 {
     Vector3d particlePositionNew, particleVelocityNew;
-    for (int i=0; i<particles.size(); ++i) {
-        if (particles[i].getStopSign() == false) {
-            particleVelocityNew = particles[i].getVelocity() + particleAcceleration*hStep;
-            particlePositionNew = particles[i].getPosition() + particles[i].getVelocity()*hStep;
+    
+    for (it = particles.begin(); it!=particles.end(); ++it) {
+        it->setLifeSpan(it->getLifeSpan()+1);
+        if (it->getStopSign() == false) {
+            particleVelocityNew = it->getVelocity() + particleAcceleration*hStep;
+            particlePositionNew = it->getPosition() + it->getVelocity()*hStep;
             
             //cout<<"Velocity: "<<particleVelocityNew<<endl;
             //cout<<"Postion:  "<<particlePositionNew<<endl;
             
             if (particlePositionNew.y >-10) {
-                particles[i].setVelocity(particleVelocityNew);
-                particles[i].setPosition(particlePositionNew);
+                it->setVelocity(particleVelocityNew);
+                it->setPosition(particlePositionNew);
             }
             else
             {
-                particles[i].setStopSign(true);
+                it->setStopSign(true);
             }
         }
+        
+        if (it->getLifeSpan()>300) {
+            it = particles.erase(it);
+            std::cout<<"delete"<<std::endl;
+            --it;
+        }
+        
     }
    
 }
@@ -121,7 +136,9 @@ void timeProc(int id)
     if (id == 1) {
             calculatePosition();
             glutPostRedisplay();
-        
+            particlesGenerator();
+        std::cout<<"size: "<<particles.size()<<std::endl;
+        std::cout<<"lifeSpan: "<<particles[0].getLifeSpan()<<std::endl;
             glutTimerFunc(automaticSpeed, timeProc, 1);
 
         
@@ -129,11 +146,20 @@ void timeProc(int id)
     
 }
 
+void timeProc_clean(int id)
+{
+    if (id  == 2) {
+        particles.clear();
+        glutTimerFunc(cleanSpeed, timeProc_clean, 2);
+    }
+}
+
 void handleKey(unsigned char key, int x, int y){
     switch(key){
         case 'a':
         case 'A':
             glutTimerFunc(automaticSpeed, timeProc, 1);
+            //glutTimerFunc(cleanSpeed, timeProc_clean, 2);
             break;
             
         case 'm':
