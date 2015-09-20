@@ -13,11 +13,18 @@
 
 #define automaticSpeed 20
 #define cleanSpeed 3000
+#define PRECISION  0.1
 
-int WIDTH = 800;
+int WIDTH = 1000;
 int HEIGHT = 800;
 
-//int stopSign = 0;
+
+Vector3d rockPosition(0,0,0);
+double Tolerance = 1;
+
+double ParticleDense = 0.05;
+
+double PlaneHeight = 0;
 
 double hStep = 0.1;
 
@@ -27,6 +34,9 @@ std::vector<Particle>::iterator it;
 
 
 Vector3d particleAcceleration(0, -1, 0);
+
+double RockRADIUS = 1;
+Vector3d sphereCenter(0,0,-2);
 
 
 void mouseEventHandler(int button, int state, int x, int y) {
@@ -44,8 +54,8 @@ void motionEventHandler(int x, int y) {
 
 void particlesGenerator()
 {
-        for (float i = -5; i<5; i+=1) {
-            particles.push_back( Particle(Vector3d(i,gauss(10, 1, 1),-10), Vector3d(0,0,gauss(2, 0.5, 1)), Vector4d(0,1,1,1), 1, 10, 0.5, false) );//position,velocity,color,mass,lifespan,pointsize,stopSign
+        for (float i = -5; i<5; i+=ParticleDense) {
+            particles.push_back( Particle(Vector3d(i,gauss(10, 1, 1),-10), Vector3d(0,0,gauss(1.5, 0.5, 1)), Vector4d(0,1,1,1), 1, 10, 0.5, false) );//position,velocity,color,mass,lifespan,pointsize,stopSign
     }
 
 }
@@ -64,7 +74,7 @@ void init() {
     
     //glEnable(GL_DEPTH_TEST);
     glEnable(GL_NORMALIZE);
-    particles.reserve(10000000);
+    particles.reserve(1000000);
     particlesGenerator();
         
 }
@@ -82,7 +92,8 @@ void myDisplay(void)
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     
- 
+    
+    
     //glTranslatef(0,0,0);
     glBegin(GL_POINTS);
     for (int i = 0; i < particles.size(); ++i) {
@@ -98,10 +109,69 @@ void myDisplay(void)
     glutSwapBuffers();
 }
 
+
+bool detectSphereCollision(Vector3d& particlePosition, Vector3d& particleVelocity,  Vector3d& particlePositionNew  , Vector3d&  particleVelocityNew)
+{
+   
+    Vector3d LVector = sphereCenter - particlePosition;
+    double L = LVector.norm();
+    Vector3d VDirection = (particlePositionNew - particlePosition).normalize();
+    double tc = LVector * VDirection;
+    if (tc < 0.0) {
+        return  false;
+    }
+    double d = sqrt((L*L)-(tc*tc));
+    if (d > RockRADIUS) {
+        return false;
+    }
+    
+    double t1c = sqrt(RockRADIUS*RockRADIUS-d*d);
+    
+    double t1 = tc - t1c;
+    double t2 = tc + t1c;
+    
+    Vector3d collisionPoint = particlePosition + t1*VDirection;
+    
+    
+    Vector3d normalVector = (collisionPoint - sphereCenter);
+    double d1 = (particlePosition - collisionPoint)*normalVector;
+    double d2 = (particlePositionNew - collisionPoint)*normalVector;
+    if (d1*d2<0) {
+        particlePositionNew = particlePositionNew - 1.7*d2*normalVector;
+        Vector3d vn = (particleVelocity*normalVector)*normalVector;
+        Vector3d vt = particleVelocity - vn;
+        particleVelocityNew = -0.3*vn + 0.3*vt;
+        it->setColor(Vector4d(1,1,1,1));
+    }
+    
+    return true;
+    
+   
+}
+
+void detectPlaneCollision(Vector3d& particlePosition, Vector3d& particleVelocity,  Vector3d& particlePositionNew  , Vector3d&  particleVelocityNew)
+{
+    
+        Vector3d p(0,0,0);
+        Vector3d n(0,1,0);
+        double d1 = (particlePosition - p) * n;
+        double d2 = (particlePositionNew - p)*n;
+        if (d1*d2<0) {
+                 //std::cout<<"collsion"<<std::endl;
+            particlePositionNew = particlePositionNew - 1.7*d2*n;
+            Vector3d vn = (particleVelocity*n)*n;
+            Vector3d vt = particleVelocity - vn;
+            particleVelocityNew = -0.5*vn + 0.5*vt;
+            it->setColor(Vector4d(1,1,1,1));
+        }
+
+         
+    
+}
+
 void calculatePosition()
 {
     Vector3d particlePositionNew, particleVelocityNew;
-    
     for (it = particles.begin(); it!=particles.end(); ++it) {
         it->setLifeSpan(it->getLifeSpan()+1);
         if (it->getStopSign() == false) {
@@ -112,8 +182,31 @@ void calculatePosition()
             //cout<<"Postion:  "<<particlePositionNew<<endl;
             
             if (particlePositionNew.y >-10) {
+                Vector3d PTmp = it->getPosition();
+                Vector3d VTmp = it->getVelocity();
+                
+                /*
+                //planeDetect
+                if (PTmp.y<3&&(PTmp.x<2&&PTmp.x>-2)&&(PTmp.z<0&&PTmp.z>-5))
+                {
+                    detectPlaneCollision(PTmp, VTmp, particlePositionNew, particleVelocityNew);
+                }
+                */
+                
+                //sphere
+                if (PTmp.y>(sphereCenter.y-RockRADIUS)&&PTmp.y<(sphereCenter.y+RockRADIUS)
+                    && PTmp.x>(sphereCenter.x-RockRADIUS)&&PTmp.x<(sphereCenter.x+RockRADIUS)
+                    &&PTmp.z>(sphereCenter.z-RockRADIUS)&&PTmp.z<(sphereCenter.z+RockRADIUS)) {
+                    
+                    if(detectSphereCollision(PTmp, VTmp, particlePositionNew, particleVelocityNew))
+                        cout<<"Collision: "<<endl;
+                }
+                
+                
                 it->setVelocity(particleVelocityNew);
                 it->setPosition(particlePositionNew);
+                
+                
             }
             else
             {
@@ -121,13 +214,19 @@ void calculatePosition()
             }
         }
         
+        
+        //Particles destroy  lifeSpan=300
         if (it->getLifeSpan()>300) {
-            it = particles.erase(it);
-            std::cout<<"delete"<<std::endl;
+            it = particles.erase(particles.begin(), particles.begin()+1000);
+            //std::cout<<"delete"<<std::endl;
             --it;
         }
         
     }
+    
+    
+    
+    
    
 }
 
@@ -137,8 +236,8 @@ void timeProc(int id)
             calculatePosition();
             glutPostRedisplay();
             particlesGenerator();
-        std::cout<<"size: "<<particles.size()<<std::endl;
-        std::cout<<"lifeSpan: "<<particles[0].getLifeSpan()<<std::endl;
+        //std::cout<<"size: "<<particles.size()<<std::endl;
+        //std::cout<<"lifeSpan: "<<particles[0].getLifeSpan()<<std::endl;
             glutTimerFunc(automaticSpeed, timeProc, 1);
 
         
