@@ -1,5 +1,2 @@
- 100         130        0            60             0             40              0        -10       0           0.97                0.1                  50
-
-P0x,      P0y,       P0z,      xInitVelo,    yInitVelo,     zInitVelo,       accelX,    accelY,    accelZ     air-resistance        small-Step       running-Timer-interval
-
-range     -150~150         |    typical     |40| ~ |100|                |  typical |1| ~ |15|             | typical 0.90~0.99    | rang 0.05-0.15  |   typical 40-500ms
+      0.05             1.0              0  0  -2         1              3    2   -3   -3    2   -3    1    2    1      
+ParticleDense  ||  particleSize  ||   sphereCenter  sphereRadius  ||   P0x  P0y  P0z  P1x  P1y  P1z  P2x  P2y  P2z  ||

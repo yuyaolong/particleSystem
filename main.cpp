@@ -20,6 +20,16 @@
 int WIDTH = 1000;
 int HEIGHT = 800;
 
+int resetSign = 0;
+int modeCounter = 0;
+int windSign = 0;
+
+#ifdef __APPLE__
+    char* ParamFilename = "/Users/yuyaolong/Documents/自用代码库/OpenGL_EX/assignment2/assignment2/parameters";
+#else
+    char* ParamFilename = "parameters";
+#endif
+
 
 Vector3d rockPosition(0,0,0);
 
@@ -38,15 +48,42 @@ std::vector<Particle>::iterator it;
 
 Vector3d particleAcceleration(0, -1, 0);
 
+Vector3d windVelocity(0.04,0,0);
+
 //sphereParameters
 double RockRADIUS = 1;
-Vector3d sphereCenter(0,0,-2);
+Vector3d sphereCenter;
 
 
 //triangleParameters
-Vector3d P0(3,2,-3);
-Vector3d P2(-3,2,-3);
-Vector3d P1(0,2,1);
+Vector3d P0;
+Vector3d P2;
+Vector3d P1;
+
+
+
+
+void LoadParameters(char *filename){
+    
+    FILE *paramfile;
+    
+    if((paramfile = fopen(filename, "r")) == NULL){
+        fprintf(stderr, "error opening parameter file %s\n", filename);
+        exit(1);
+    }
+    
+    //ParamFilename = filename;
+    cout<<ParamFilename<<endl;
+    
+    if(fscanf(paramfile, "%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf",
+              &ParticleDense, &particleSize, &sphereCenter.x, &sphereCenter.y, &sphereCenter.z, &RockRADIUS, &P0.x, &P0.y, &P0.z, &P1.x, &P1.y, &P1.z,&P2.x,&P2.y,&P2.z) != 15){
+        fprintf(stderr, "error reading parameter file %s\n", filename);
+        fclose(paramfile);
+        exit(1);
+    }
+}
+
+
 
 void mouseEventHandler(int button, int state, int x, int y) {
     // let the camera handle some specific mouse events (similar to maya)
@@ -74,6 +111,8 @@ void init() {
     //LoadParameters(ParamFilename);
     // set up camera
     // parameters are eye point, aim point, up vector
+    LoadParameters(ParamFilename);
+    
     camera = new Camera(Vector3d(0, 0, 1), Vector3d(0, 0, 0), Vector3d(0, 1, 0));
     
     // black background for window
@@ -115,10 +154,12 @@ void myDisplay(void)
         glEnd();
     }
     
-    
-    glColor4f(0.2, 0.2, 0.2,0.5);
-    glTranslatef(sphereCenter.x,sphereCenter.y,sphereCenter.z);
-    glutSolidSphere(RockRADIUS, 20, 20);
+    if (modeCounter%3 ==1 ) {
+        glColor4f(0.2, 0.2, 0.2,0.5);
+        glTranslatef(sphereCenter.x,sphereCenter.y,sphereCenter.z);
+        glutSolidSphere(RockRADIUS, 20, 20);
+    }
+   
 
     
     //glFlush();
@@ -259,34 +300,49 @@ void calculatePosition()
                 Vector3d PTmp = it->getPosition();
                 Vector3d VTmp = it->getVelocity();
                 
-                /*
-                //planeDetect
-                if (PTmp.y<3&&(PTmp.x<2&&PTmp.x>-2)&&(PTmp.z<0&&PTmp.z>-5))
-                {
-                    detectPlaneCollision(PTmp, VTmp, particlePositionNew, particleVelocityNew);
-                }
-                */
-                
-                /*
-                //sphere
-                if (PTmp.y>(sphereCenter.y-RockRADIUS)&&PTmp.y<(sphereCenter.y+RockRADIUS)
-                    && PTmp.x>(sphereCenter.x-RockRADIUS)&&PTmp.x<(sphereCenter.x+RockRADIUS)
-                    &&PTmp.z>(sphereCenter.z-RockRADIUS)&&PTmp.z<(sphereCenter.z+RockRADIUS)) {
-                    
-                    if(detectSphereCollision(PTmp, VTmp, particlePositionNew, particleVelocityNew))
+                if (modeCounter%3 == 0) {
+                    //planeDetect
+                    if (PTmp.y<3&&(PTmp.x<2&&PTmp.x>-2)&&(PTmp.z<0&&PTmp.z>-5))
                     {
-                        
+                        detectPlaneCollision(PTmp, VTmp, particlePositionNew, particleVelocityNew);
                     }
-                        //cout<<"Collision: "<<endl;
                 }
-                */
+               
                 
-                if (detectTriangleCollision(PTmp, VTmp, particlePositionNew, particleVelocityNew)) {
-                    //cout<<"Collision: "<<endl;
+                if (modeCounter%3 == 1) {
+                    
+                     //sphere
+                     if (PTmp.y>(sphereCenter.y-RockRADIUS)&&PTmp.y<(sphereCenter.y+RockRADIUS)
+                     && PTmp.x>(sphereCenter.x-RockRADIUS)&&PTmp.x<(sphereCenter.x+RockRADIUS)
+                     &&PTmp.z>(sphereCenter.z-RockRADIUS)&&PTmp.z<(sphereCenter.z+RockRADIUS)) {
+                     
+                         if(detectSphereCollision(PTmp, VTmp, particlePositionNew, particleVelocityNew))
+                         {
+                     
+                         }
+                    }
+                     
+                }
+               
+                
+                if (modeCounter%3 == 2) {
+                    if (detectTriangleCollision(PTmp, VTmp, particlePositionNew, particleVelocityNew)) {
+    
+                    }
                 }
                 
                 
-                it->setVelocity(particleVelocityNew);
+                if (windSign%3 == 1) {
+                    it->setVelocity(particleVelocityNew+windVelocity);
+                }
+                else if(windSign%3 == 2)
+                    {
+                        it->setVelocity(particleVelocityNew-windVelocity);
+                    }
+                    else
+                    {
+                        it->setVelocity(particleVelocityNew);
+                    }
                 it->setPosition(particlePositionNew);
                 
                 
@@ -306,13 +362,7 @@ void calculatePosition()
                 --it;
             }
         }
-       
-        
     }
-    
-    
-    
-    
    
 }
 
@@ -324,34 +374,45 @@ void timeProc(int id)
             particlesGenerator();
         //std::cout<<"size: "<<particles.size()<<std::endl;
         //std::cout<<"lifeSpan: "<<particles[0].getLifeSpan()<<std::endl;
-            glutTimerFunc(automaticSpeed, timeProc, 1);
-
-        
+        if (resetSign == 0) {
+             glutTimerFunc(automaticSpeed, timeProc, 1);
+        }
     }
     
-}
-
-void timeProc_clean(int id)
-{
-    if (id  == 2) {
-        particles.clear();
-        glutTimerFunc(cleanSpeed, timeProc_clean, 2);
-    }
 }
 
 void handleKey(unsigned char key, int x, int y){
     switch(key){
         case 'a':
         case 'A':
+            resetSign = 0;
             glutTimerFunc(automaticSpeed, timeProc, 1);
-            //glutTimerFunc(cleanSpeed, timeProc_clean, 2);
             break;
             
         case 'm':
         case 'M':
-            calculatePosition();
-            glutPostRedisplay();
+            //resetSign = 1;
+            particles.clear();
+            modeCounter++;
+            glutTimerFunc(automaticSpeed, timeProc, 1);
             break;
+            
+        case 'r':
+        case 'R':
+            resetSign = 1;
+            particles.clear();
+            break;
+            
+        case 's':
+        case 'S':
+            resetSign = 1;
+            break;
+        
+        case 'w':
+        case 'W':
+            windSign++;
+            break;
+
         case 'q':       // q - quit
         case 'Q':
         case 27:        // esc - quit
