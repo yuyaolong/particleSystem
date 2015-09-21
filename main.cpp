@@ -13,20 +13,23 @@
 
 #define automaticSpeed 20
 #define cleanSpeed 3000
-#define PRECISION  0.1
+#define EPSILON  0.0001
+
+
 
 int WIDTH = 1000;
 int HEIGHT = 800;
 
 
 Vector3d rockPosition(0,0,0);
-double Tolerance = 1;
 
-double ParticleDense = 0.05;
+double ParticleDense = 0.01; //0.01
 
 double PlaneHeight = 0;
 
 double hStep = 0.1;
+
+double particleSize = 1.5;
 
 Camera *camera;
 std::vector<Particle>particles;
@@ -35,9 +38,15 @@ std::vector<Particle>::iterator it;
 
 Vector3d particleAcceleration(0, -1, 0);
 
+//sphereParameters
 double RockRADIUS = 1;
 Vector3d sphereCenter(0,0,-2);
 
+
+//triangleParameters
+Vector3d P0(3,2,-3);
+Vector3d P2(-3,2,-3);
+Vector3d P1(0,2,1);
 
 void mouseEventHandler(int button, int state, int x, int y) {
     // let the camera handle some specific mouse events (similar to maya)
@@ -55,7 +64,7 @@ void motionEventHandler(int x, int y) {
 void particlesGenerator()
 {
         for (float i = -5; i<5; i+=ParticleDense) {
-            particles.push_back( Particle(Vector3d(i,gauss(10, 1, 1),-10), Vector3d(0,0,gauss(1.5, 0.5, 1)), Vector4d(0,1,1,1), 1, 10, 0.5, false) );//position,velocity,color,mass,lifespan,pointsize,stopSign
+            particles.push_back( Particle(Vector3d(i,gauss(10, 1, 1),-10), Vector3d(0,0,gauss(1.5, 0.5, 1)), Vector4d(0,0.4,1,1), 1, 0, particleSize, false) );//position,velocity,color,mass,lifespan,pointsize,stopSign
     }
 
 }
@@ -95,18 +104,83 @@ void myDisplay(void)
     
     
     //glTranslatef(0,0,0);
-    glBegin(GL_POINTS);
+    
     for (int i = 0; i < particles.size(); ++i) {
+        
         
         glPointSize(particles[i].getPointSize());
         glColor4f(particles[i].getColor().x, particles[i].getColor().y, particles[i].getColor().z, particles[i].getColor().w);
-        glVertex3f(particles[i].getPosition().x, particles[i].getPosition().y, particles[i].getPosition().z);
+        glBegin(GL_POINTS);
+            glVertex3f(particles[i].getPosition().x, particles[i].getPosition().y, particles[i].getPosition().z);
+        glEnd();
     }
-    glEnd();
+    
+    
+    glColor4f(0.2, 0.2, 0.2,0.5);
+    glTranslatef(sphereCenter.x,sphereCenter.y,sphereCenter.z);
+    glutSolidSphere(RockRADIUS, 20, 20);
 
     
     //glFlush();
     glutSwapBuffers();
+}
+
+
+bool detectTriangleCollision(Vector3d& particlePosition, Vector3d& particleVelocity,  Vector3d& particlePositionNew  , Vector3d&  particleVelocityNew)
+{
+    Vector3d vn =  (P2 - P1)%(P1 - P0);
+    double vnnorm = vn.norm();
+    Vector3d n = vn.normalize();
+    double a = (particlePosition - P0)*n;
+    double b = (particlePositionNew - P0)*n;
+    
+    Vector3d D = (particlePositionNew - particlePosition).normalize();
+    
+    Vector3d hitPosition;
+    if (a*b<0) {
+        double s = a/(a-b);
+
+        hitPosition = particlePosition + (particlePositionNew - particlePosition)*(s*hStep);
+        
+        Vector3d e1 = P1-P0;
+        Vector3d e2 = P2-P0;
+        
+        Vector3d P = D % e2;
+        double det = e1 * P;
+        
+        if(det > -EPSILON && det < EPSILON) return false;
+        double inv_det = 1.f / det;
+        
+        Vector3d T = particlePosition - P0;
+        double u = (T*P)*inv_det;
+        
+        if(u < 0.f || u > 1.f) return false;
+        
+        
+        Vector3d Q = T % e1;
+        double v = (D * Q) * inv_det;
+        
+        if(v < 0.f || u + v  > 1.f) return false;
+        
+        double t = (e2 * Q) * inv_det;
+        
+        if(t > EPSILON) { //ray intersection
+            
+            //std::cout<<"U: "<<u<<std::endl;
+            //std::cout<<"V: "<<v<<std::endl;
+            double d1 = (particlePosition - hitPosition)*n;
+            double d2 = (particlePositionNew - hitPosition)*n;
+            particlePositionNew = particlePositionNew - 1.7*d2*n;
+            Vector3d vn = (particleVelocity*n)*n;
+            Vector3d vt = particleVelocity - vn;
+            particleVelocityNew = -0.4*vn + 0.4*vt;
+            it->setColor(Vector4d(1,1,1,1));
+            return true;
+        }
+        
+    }
+    
+    return false;
 }
 
 
@@ -133,7 +207,7 @@ bool detectSphereCollision(Vector3d& particlePosition, Vector3d& particleVelocit
     Vector3d collisionPoint = particlePosition + t1*VDirection;
     
     
-    Vector3d normalVector = (collisionPoint - sphereCenter);
+    Vector3d normalVector = (collisionPoint - sphereCenter).normalize();
     double d1 = (particlePosition - collisionPoint)*normalVector;
     double d2 = (particlePositionNew - collisionPoint)*normalVector;
     if (d1*d2<0) {
@@ -193,13 +267,22 @@ void calculatePosition()
                 }
                 */
                 
+                /*
                 //sphere
                 if (PTmp.y>(sphereCenter.y-RockRADIUS)&&PTmp.y<(sphereCenter.y+RockRADIUS)
                     && PTmp.x>(sphereCenter.x-RockRADIUS)&&PTmp.x<(sphereCenter.x+RockRADIUS)
                     &&PTmp.z>(sphereCenter.z-RockRADIUS)&&PTmp.z<(sphereCenter.z+RockRADIUS)) {
                     
                     if(detectSphereCollision(PTmp, VTmp, particlePositionNew, particleVelocityNew))
-                        cout<<"Collision: "<<endl;
+                    {
+                        
+                    }
+                        //cout<<"Collision: "<<endl;
+                }
+                */
+                
+                if (detectTriangleCollision(PTmp, VTmp, particlePositionNew, particleVelocityNew)) {
+                    //cout<<"Collision: "<<endl;
                 }
                 
                 
@@ -216,11 +299,14 @@ void calculatePosition()
         
         
         //Particles destroy  lifeSpan=300
-        if (it->getLifeSpan()>300) {
-            it = particles.erase(particles.begin(), particles.begin()+1000);
-            //std::cout<<"delete"<<std::endl;
-            --it;
+        if (ParticleDense<0.2) {
+            if (it->getLifeSpan()>300) {
+                it = particles.erase(particles.begin(), particles.begin()+1000);
+                //std::cout<<"delete"<<std::endl;
+                --it;
+            }
         }
+       
         
     }
     
